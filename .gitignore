@@ -1,0 +1,19 @@
+.DS_Store
+
+# Local planning and internal docs
+PRD.md
+
+# Build artifacts
+build/
+dist/
+DerivedData/
+
+# Xcode user-specific files
+*.xcuserstate
+xcuserdata/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
