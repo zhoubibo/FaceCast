@@ -96,6 +96,44 @@ final class ResizeHandleView: NSView {
     }
 }
 
+final class HoverTrackingView: NSView {
+    var onHoverChanged: ((Bool) -> Void)?
+
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        self.trackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+    }
+}
+
 final class OverlayAccessoryButton: NSButton {
     var actionHandler: (() -> Void)?
 
@@ -109,7 +147,7 @@ final class OverlayAccessoryButton: NSButton {
         toolTip = tooltip
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.24).cgColor
-        layer?.cornerRadius = 14
+        layer?.cornerRadius = 10
         layer?.borderWidth = 1
         layer?.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
         target = self
@@ -139,7 +177,7 @@ final class OverlayAccessoryButton: NSButton {
 final class CameraOverlayWindow: NSPanel {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 158),
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 135),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false

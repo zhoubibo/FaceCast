@@ -8,6 +8,8 @@ import CoreGraphics
 /// composite using the most recent camera frame. Camera frames only refresh the
 /// cached frame, so the two sources can run at different rates without stutter.
 final class FrameCompositor {
+    private let roundedRectAspectRatio: CGFloat = 200.0 / 135.0
+
     /// Layout used for the next composite. Thread-safe; the UI writes it and the
     /// capture queue reads it.
     var pipState: PiPState {
@@ -86,14 +88,12 @@ final class FrameCompositor {
 
         case .floating:
             let overlayWidth = state.normalizedWidth * width
-            let overlayHeight: CGFloat
+            let overlayHeight = overlayHeight(for: overlayWidth, shape: state.shape)
             let scale: CGFloat
             switch state.shape {
             case .roundedRect:
-                scale = overlayWidth / extent.width
-                overlayHeight = extent.height * scale
+                scale = max(overlayWidth / extent.width, overlayHeight / extent.height)
             case .circle:
-                overlayHeight = overlayWidth
                 scale = max(overlayWidth / extent.width, overlayHeight / extent.height)
             }
 
@@ -126,6 +126,15 @@ final class FrameCompositor {
             kCIInputBackgroundImageKey: CIImage.empty(),
             kCIInputMaskImageKey: mask,
         ])
+    }
+
+    private func overlayHeight(for width: CGFloat, shape: PiPShape) -> CGFloat {
+        switch shape {
+        case .roundedRect:
+            return width / roundedRectAspectRatio
+        case .circle:
+            return width
+        }
     }
 
     /// A white shape on black, used as an alpha mask. Cached by size and shape.

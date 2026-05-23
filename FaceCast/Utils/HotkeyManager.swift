@@ -9,6 +9,10 @@ import Carbon.HIToolbox
 final class HotkeyManager {
     var onToggleRecording: (() -> Void)?
     var onTogglePause: (() -> Void)?
+    var onToggleOverlayVisibility: (() -> Void)?
+    var onSetOverlayFullscreen: (() -> Void)?
+    var onSetOverlayFloating: (() -> Void)?
+    var onToggleMicrophoneMuted: (() -> Void)?
 
     private var hotKeyRefs: [EventHotKeyRef?] = []
     private var handlerRef: EventHandlerRef?
@@ -16,6 +20,10 @@ final class HotkeyManager {
     private static let signature: OSType = 0x46435354 // "FCST"
     private static let toggleRecordingID: UInt32 = 1
     private static let togglePauseID: UInt32 = 2
+    private static let toggleOverlayVisibilityID: UInt32 = 3
+    private static let setOverlayFullscreenID: UInt32 = 4
+    private static let setOverlayFloatingID: UInt32 = 5
+    private static let toggleMicrophoneMutedID: UInt32 = 6
 
     func registerDefaults() {
         guard handlerRef == nil else { return }
@@ -45,6 +53,18 @@ final class HotkeyManager {
         register(id: Self.togglePauseID,
                  keyCode: UInt32(kVK_ANSI_1),
                  modifiers: UInt32(cmdKey | shiftKey))
+        register(id: Self.toggleOverlayVisibilityID,
+                 keyCode: UInt32(kVK_ANSI_Q),
+                 modifiers: UInt32(optionKey))
+        register(id: Self.setOverlayFullscreenID,
+                 keyCode: UInt32(kVK_ANSI_O),
+                 modifiers: UInt32(optionKey))
+        register(id: Self.setOverlayFloatingID,
+                 keyCode: UInt32(kVK_ANSI_I),
+                 modifiers: UInt32(optionKey))
+        register(id: Self.toggleMicrophoneMutedID,
+                 keyCode: UInt32(kVK_ANSI_P),
+                 modifiers: UInt32(optionKey))
     }
 
     func unregisterAll() {
@@ -73,6 +93,10 @@ final class HotkeyManager {
             switch id {
             case Self.toggleRecordingID: self?.onToggleRecording?()
             case Self.togglePauseID: self?.onTogglePause?()
+            case Self.toggleOverlayVisibilityID: self?.onToggleOverlayVisibility?()
+            case Self.setOverlayFullscreenID: self?.onSetOverlayFullscreen?()
+            case Self.setOverlayFloatingID: self?.onSetOverlayFloating?()
+            case Self.toggleMicrophoneMutedID: self?.onToggleMicrophoneMuted?()
             default: break
             }
         }

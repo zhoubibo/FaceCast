@@ -148,6 +148,26 @@ struct StudioMetric: View {
     }
 }
 
+struct StudioInlineMetric: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .tracking(1)
+                .foregroundStyle(StudioPalette.mutedInk)
+
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(StudioPalette.ink)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct StudioWaveform: View {
     let isActive: Bool
 

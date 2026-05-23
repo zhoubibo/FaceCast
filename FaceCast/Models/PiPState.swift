@@ -26,5 +26,5 @@ struct PiPState {
     var normalizedCenter: CGPoint = CGPoint(x: 0.82, y: 0.82)
 
     /// Overlay width as a fraction (0...1) of the composed frame width.
-    var normalizedWidth: CGFloat = 0.20
+    var normalizedWidth: CGFloat = 0.14
 }

@@ -54,6 +54,18 @@ final class RecordingCoordinator: ObservableObject {
         hotkeys.onTogglePause = { [weak self] in
             self?.togglePauseFromHotkey()
         }
+        hotkeys.onToggleOverlayVisibility = { [weak self] in
+            self?.toggleCameraOverlay()
+        }
+        hotkeys.onSetOverlayFullscreen = { [weak self] in
+            self?.showCameraOverlay(in: .fullscreen)
+        }
+        hotkeys.onSetOverlayFloating = { [weak self] in
+            self?.showCameraOverlay(in: .floating)
+        }
+        hotkeys.onToggleMicrophoneMuted = { [weak self] in
+            self?.toggleMicrophoneMuted()
+        }
         hotkeys.registerDefaults()
     }
 
@@ -76,15 +88,22 @@ final class RecordingCoordinator: ObservableObject {
     }
 
     func showCameraOverlay() {
+        showCameraOverlay(in: pipState.mode)
+    }
+
+    func showCameraOverlay(in mode: PiPMode) {
         do {
             try ensureCameraReady()
         } catch {
             errorMessage = "摄像头不可用：\(error.localizedDescription)"
             return
         }
+        pipState.mode = mode
+        compositor.pipState = pipState
         overlayController.setCameraResolution(cameraCapture.cameraResolution)
         overlayController.show(normalizedCenter: pipState.normalizedCenter,
                                normalizedWidth: pipState.normalizedWidth)
+        overlayController.applyMode(mode)
         isOverlayVisible = true
     }
 
@@ -175,11 +194,7 @@ final class RecordingCoordinator: ObservableObject {
 
     /// Toggles the camera overlay between fullscreen and floating modes.
     func togglePiPMode() {
-        pipState.mode = (pipState.mode == .fullscreen) ? .floating : .fullscreen
-        compositor.pipState = pipState
-        if overlayController.isVisible {
-            overlayController.applyMode(pipState.mode)
-        }
+        setPiPMode((pipState.mode == .fullscreen) ? .floating : .fullscreen)
     }
 
     func togglePiPShape() {
@@ -194,14 +209,19 @@ final class RecordingCoordinator: ObservableObject {
         overlayController.setMicrophoneMuted(isMicrophoneMuted)
     }
 
+    func setPiPMode(_ mode: PiPMode) {
+        pipState.mode = mode
+        compositor.pipState = pipState
+        if overlayController.isVisible {
+            overlayController.applyMode(mode)
+        }
+    }
+
     /// Sets up the encoder + capture wiring and starts the streams.
     private func beginCapture() {
-        guard PermissionManager.canCaptureScreen() else {
+        if !PermissionManager.canCaptureScreen() {
             PermissionManager.markScreenRecordingPrompted()
             CGRequestScreenCaptureAccess()
-            errorMessage = "未获得屏幕录制权限。请在“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”中允许 FaceCast，并在授权后完全退出再重新打开应用。"
-            state = .idle
-            return
         }
 
         let outputURL = Self.makeOutputURL(in: settings.outputDirectory,
@@ -255,7 +275,11 @@ final class RecordingCoordinator: ObservableObject {
                 startTimer()
             } catch {
                 stopCaptureSources()
-                errorMessage = error.localizedDescription
+                if PermissionManager.isScreenCapturePermissionError(error) || !PermissionManager.canCaptureScreen() {
+                    errorMessage = "未获得屏幕录制权限。请在“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”中允许 FaceCast，然后完全退出并重新打开应用。"
+                } else {
+                    errorMessage = error.localizedDescription
+                }
                 state = .idle
             }
         }

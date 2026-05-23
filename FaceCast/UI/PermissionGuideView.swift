@@ -15,6 +15,10 @@ struct PermissionGuideView: View {
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(StudioPalette.ink)
 
+                    Text("V1.0.0 · 作者：Jenson")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(StudioPalette.mutedInk)
+
                     Text("先完成权限设置，FaceCast 就能开始录屏、摄像头叠加和系统音频采集。")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(StudioPalette.mutedInk)
@@ -39,29 +43,44 @@ struct PermissionGuideView: View {
                 }
             }
 
-            HStack(spacing: 12) {
-                Button("请求屏幕录制") {
-                    permissions.requestScreenRecording()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    requestScreenRecordingButton
+                    requestCameraAndMicrophoneButton
                 }
-                .buttonStyle(StudioPrimaryButtonStyle())
 
-                Button("请求摄像头 / 麦克风") {
-                    Task { await permissions.requestCameraAndMicrophone() }
+                VStack(spacing: 12) {
+                    requestScreenRecordingButton
+                    requestCameraAndMicrophoneButton
                 }
-                .buttonStyle(StudioSecondaryButtonStyle())
             }
 
-            Button("打开系统设置") {
-                openScreenRecordingSettings()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    runDiagnosticsButton
+                    openSystemSettingsButton
+                }
+
+                VStack(spacing: 12) {
+                    runDiagnosticsButton
+                    openSystemSettingsButton
+                }
             }
-            .buttonStyle(StudioSecondaryButtonStyle())
+
+            StudioCard {
+                Text(permissions.screenRecordingDiagnosticMessage)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(StudioPalette.mutedInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Text("提示：macOS 的屏幕录制权限在首次允许后，通常需要完全退出并重新打开 FaceCast 才会生效。")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(StudioPalette.mutedInk)
         }
-        .padding(28)
-        .frame(width: 460)
+        .padding(24)
+        .frame(width: 420)
         .studioPanelBackground()
     }
 
@@ -126,5 +145,33 @@ struct PermissionGuideView: View {
         if let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    private var requestScreenRecordingButton: some View {
+        Button("请求屏幕录制") {
+            permissions.requestScreenRecording()
+        }
+        .buttonStyle(StudioPrimaryButtonStyle())
+    }
+
+    private var requestCameraAndMicrophoneButton: some View {
+        Button("请求摄像头 / 麦克风") {
+            Task { await permissions.requestCameraAndMicrophone() }
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var runDiagnosticsButton: some View {
+        Button("权限诊断") {
+            Task { await permissions.runScreenRecordingDiagnostics() }
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var openSystemSettingsButton: some View {
+        Button("打开系统设置") {
+            openScreenRecordingSettings()
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
     }
 }

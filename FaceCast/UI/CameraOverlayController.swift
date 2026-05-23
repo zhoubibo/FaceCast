@@ -9,6 +9,13 @@ import AVFoundation
 /// remembering the floating frame so it can be restored.
 @MainActor
 final class CameraOverlayController: NSObject, NSWindowDelegate {
+    private let minimumFloatingWidth: CGFloat = 150
+    private let maximumFloatingWidth: CGFloat = 500
+    private let minimumCircleWidth: CGFloat = 132
+    private let maximumCircleWidth: CGFloat = 300
+    private let circleScaleFactor: CGFloat = 0.78
+    private let roundedRectAspectRatio: CGFloat = 200.0 / 135.0
+
     /// Called with (normalizedCenter, normalizedWidth) whenever the panel moves
     /// or resizes. Coordinates use a top-left origin.
     var onLayoutChanged: ((CGPoint, CGFloat) -> Void)?
@@ -24,6 +31,7 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
     private let panel = CameraOverlayWindow()
     private let previewView = CameraPreviewView()
     private let resizeHandle = ResizeHandleView()
+    private let accessoryRevealArea = HoverTrackingView()
     private let accessoryBar = NSVisualEffectView()
     private let muteButton = OverlayAccessoryButton(symbolName: "mic.fill", tooltip: "静音麦克风")
     private let shapeButton = OverlayAccessoryButton(symbolName: "circle.dashed", tooltip: "切换圆形气泡")
@@ -55,36 +63,48 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         accessoryBar.material = .hudWindow
         accessoryBar.state = .active
         accessoryBar.wantsLayer = true
-        accessoryBar.layer?.cornerRadius = 17
+        accessoryBar.layer?.cornerRadius = 12
         accessoryBar.layer?.masksToBounds = true
+        accessoryBar.alphaValue = 0
+        accessoryBar.isHidden = true
 
         let accessoryStack = NSStackView(views: [muteButton, shapeButton, hideButton])
         accessoryStack.orientation = .horizontal
-        accessoryStack.spacing = 8
+        accessoryStack.spacing = 5
         accessoryStack.translatesAutoresizingMaskIntoConstraints = false
 
         for button in [muteButton, shapeButton, hideButton] {
             NSLayoutConstraint.activate([
-                button.widthAnchor.constraint(equalToConstant: 30),
-                button.heightAnchor.constraint(equalToConstant: 30),
+                button.widthAnchor.constraint(equalToConstant: 22),
+                button.heightAnchor.constraint(equalToConstant: 22),
             ])
         }
 
-        previewView.addSubview(accessoryBar)
+        accessoryRevealArea.translatesAutoresizingMaskIntoConstraints = false
+        accessoryRevealArea.onHoverChanged = { [weak self] isHovered in
+            self?.setAccessoryBarVisible(isHovered, animated: true)
+        }
+
+        previewView.addSubview(accessoryRevealArea)
+        accessoryRevealArea.addSubview(accessoryBar)
         accessoryBar.addSubview(accessoryStack)
-        accessoryTopConstraint = accessoryBar.topAnchor.constraint(equalTo: previewView.topAnchor, constant: 12)
-        accessoryTrailingConstraint = accessoryBar.trailingAnchor.constraint(equalTo: previewView.trailingAnchor, constant: -12)
-        accessoryCenterXConstraint = accessoryBar.centerXAnchor.constraint(equalTo: previewView.centerXAnchor)
+        accessoryTopConstraint = accessoryRevealArea.topAnchor.constraint(equalTo: previewView.topAnchor, constant: 2)
+        accessoryTrailingConstraint = accessoryRevealArea.trailingAnchor.constraint(equalTo: previewView.trailingAnchor, constant: -2)
+        accessoryCenterXConstraint = accessoryRevealArea.centerXAnchor.constraint(equalTo: previewView.centerXAnchor)
 
         resizeHandle.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(resizeHandle)
         NSLayoutConstraint.activate([
             accessoryTopConstraint!,
             accessoryTrailingConstraint!,
-            accessoryStack.leadingAnchor.constraint(equalTo: accessoryBar.leadingAnchor, constant: 8),
-            accessoryStack.trailingAnchor.constraint(equalTo: accessoryBar.trailingAnchor, constant: -8),
-            accessoryStack.topAnchor.constraint(equalTo: accessoryBar.topAnchor, constant: 8),
-            accessoryStack.bottomAnchor.constraint(equalTo: accessoryBar.bottomAnchor, constant: -8),
+            accessoryRevealArea.widthAnchor.constraint(equalTo: accessoryBar.widthAnchor, constant: 16),
+            accessoryRevealArea.heightAnchor.constraint(equalTo: accessoryBar.heightAnchor, constant: 16),
+            accessoryBar.centerXAnchor.constraint(equalTo: accessoryRevealArea.centerXAnchor),
+            accessoryBar.centerYAnchor.constraint(equalTo: accessoryRevealArea.centerYAnchor),
+            accessoryStack.leadingAnchor.constraint(equalTo: accessoryBar.leadingAnchor, constant: 5),
+            accessoryStack.trailingAnchor.constraint(equalTo: accessoryBar.trailingAnchor, constant: -5),
+            accessoryStack.topAnchor.constraint(equalTo: accessoryBar.topAnchor, constant: 5),
+            accessoryStack.bottomAnchor.constraint(equalTo: accessoryBar.bottomAnchor, constant: -5),
             resizeHandle.widthAnchor.constraint(equalToConstant: 22),
             resizeHandle.heightAnchor.constraint(equalToConstant: 22),
             resizeHandle.trailingAnchor.constraint(equalTo: previewView.trailingAnchor, constant: -8),
@@ -103,6 +123,7 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
             self?.onRequestHide?()
         }
         updateAccessoryLayout()
+        setAccessoryControlsEnabled(false)
     }
 
     /// Updates the camera aspect ratio used when sizing the panel.
@@ -127,6 +148,7 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
     func hide() {
         panel.orderOut(nil)
         isVisible = false
+        setAccessoryBarVisible(false, animated: false)
     }
 
     func setMicrophoneMuted(_ isMuted: Bool) {
@@ -182,6 +204,7 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         }
         mode = newMode
         updateAccessoryLayout()
+        setAccessoryBarVisible(false, animated: false)
     }
 
     // MARK: - NSWindowDelegate
@@ -198,8 +221,8 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
 
     private func panelFrame(center: CGPoint, width: CGFloat, screen: NSScreen) -> NSRect {
         let screenFrame = screen.frame
-        let panelWidth = min(max(width * screenFrame.width, 150), screenFrame.width * 0.5)
-        let panelHeight = shape == .circle ? panelWidth : panelWidth / aspectRatio
+        let panelWidth = min(max(width * screenFrame.width, minimumFloatingWidth), screenFrame.width * 0.5)
+        let panelHeight = overlayHeight(for: panelWidth, shape: shape)
         let midX = screenFrame.minX + center.x * screenFrame.width
         let midY = screenFrame.minY + (1 - center.y) * screenFrame.height
         return NSRect(x: midX - panelWidth / 2,
@@ -212,8 +235,10 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         guard mode == .floating else { return }
         var frame = panel.frame
         let top = frame.maxY
-        let newWidth = min(max(180, frame.width + event.deltaX), 500)
-        let newHeight = shape == .circle ? newWidth : newWidth / aspectRatio
+        let minimumWidth = shape == .circle ? minimumCircleWidth : minimumFloatingWidth
+        let maximumWidth = shape == .circle ? maximumCircleWidth : maximumFloatingWidth
+        let newWidth = min(max(minimumWidth, frame.width + event.deltaX), maximumWidth)
+        let newHeight = overlayHeight(for: newWidth, shape: shape)
         frame.size = NSSize(width: newWidth, height: newHeight)
         frame.origin.y = top - newHeight
         panel.setFrame(frame, display: true)
@@ -227,11 +252,11 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         let width = max(frame.width, frame.height)
 
         if shape == .circle {
-            let square = min(max(width, 180), 360)
+            let square = min(max(width * circleScaleFactor, minimumCircleWidth), maximumCircleWidth)
             frame.size = NSSize(width: square, height: square)
         } else {
-            let adjustedWidth = min(max(width, 180), 500)
-            frame.size = NSSize(width: adjustedWidth, height: adjustedWidth / aspectRatio)
+            let adjustedWidth = min(max(width, minimumFloatingWidth), maximumFloatingWidth)
+            frame.size = NSSize(width: adjustedWidth, height: overlayHeight(for: adjustedWidth, shape: .roundedRect))
         }
 
         frame.origin = CGPoint(x: center.x - frame.width / 2, y: center.y - frame.height / 2)
@@ -249,7 +274,49 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         let useCenteredLayout = mode == .floating && shape == .circle
         accessoryTrailingConstraint?.isActive = !useCenteredLayout
         accessoryCenterXConstraint?.isActive = useCenteredLayout
-        accessoryTopConstraint?.constant = useCenteredLayout ? 24 : 12
+        accessoryTopConstraint?.constant = useCenteredLayout ? 10 : 2
+    }
+
+    private func setAccessoryBarVisible(_ isVisible: Bool, animated: Bool) {
+        if isVisible {
+            accessoryBar.isHidden = false
+            accessoryBar.alphaValue = animated ? 0 : 1
+            setAccessoryControlsEnabled(true)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = animated ? 0.12 : 0
+                accessoryBar.animator().alphaValue = 1
+            }
+            return
+        }
+
+        setAccessoryControlsEnabled(false)
+        let hideBar = {
+            self.accessoryBar.alphaValue = 0
+            self.accessoryBar.isHidden = true
+        }
+        guard animated, !accessoryBar.isHidden else {
+            hideBar()
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            self.accessoryBar.animator().alphaValue = 0
+        }, completionHandler: hideBar)
+    }
+
+    private func setAccessoryControlsEnabled(_ isEnabled: Bool) {
+        muteButton.isEnabled = isEnabled
+        shapeButton.isEnabled = isEnabled
+        hideButton.isEnabled = isEnabled
+    }
+
+    private func overlayHeight(for width: CGFloat, shape: PiPShape) -> CGFloat {
+        switch shape {
+        case .roundedRect:
+            return width / roundedRectAspectRatio
+        case .circle:
+            return width
+        }
     }
 
     private func reportLayout() {

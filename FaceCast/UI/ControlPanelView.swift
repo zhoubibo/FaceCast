@@ -79,7 +79,7 @@ struct ControlPanelView: View {
     private var recordingControls: some View {
         VStack(spacing: 18) {
             StudioCard {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 8) {
                             StudioTag(title: "RECORDER", tint: StudioPalette.accentDeep)
@@ -87,6 +87,10 @@ struct ControlPanelView: View {
                             Text("FaceCast")
                                 .font(.system(size: 34, weight: .bold, design: .rounded))
                                 .foregroundStyle(StudioPalette.ink)
+
+                            Text("V1.0.0 · 作者：Jenson")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(StudioPalette.mutedInk)
 
                             Text("快速录屏，摄像头浮窗双击即可在全屏和小窗之间切换。")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -124,11 +128,17 @@ struct ControlPanelView: View {
                         }
                     }
 
-                    HStack(spacing: 12) {
-                        StudioMetric(label: "格式", value: coordinator.settings.container.displayName)
-                        StudioMetric(label: "帧率", value: "\(coordinator.settings.frameRate) fps")
-                        StudioMetric(label: "模式", value: coordinator.pipState.mode == .fullscreen ? "全屏摄像头" : "浮窗叠加")
+                    HStack(spacing: 10) {
+                        StudioInlineMetric(label: "格式", value: coordinator.settings.container.displayName)
+                        metricDivider
+                        StudioInlineMetric(label: "帧率", value: "\(coordinator.settings.frameRate) fps")
+                        metricDivider
+                        StudioInlineMetric(label: "模式", value: coordinator.pipState.mode == .fullscreen ? "全屏摄像头" : "浮窗叠加")
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.55))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
 
@@ -143,31 +153,16 @@ struct ControlPanelView: View {
                     .disabled(coordinator.state != .idle)
                     .opacity(coordinator.state == .idle ? 1 : 0.9)
 
-                    HStack(spacing: 12) {
-                        if coordinator.state == .paused {
-                            Button {
-                                coordinator.resume()
-                            } label: {
-                                Label("继续", systemImage: "play.fill")
-                            }
-                            .buttonStyle(StudioSecondaryButtonStyle())
-                        } else {
-                            Button {
-                                coordinator.pause()
-                            } label: {
-                                Label("暂停", systemImage: "pause.fill")
-                            }
-                            .buttonStyle(StudioSecondaryButtonStyle())
-                            .disabled(coordinator.state != .recording)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            playbackButton
+                            stopButton
                         }
 
-                        Button {
-                            coordinator.stopRecording()
-                        } label: {
-                            Label("停止", systemImage: "stop.fill")
+                        VStack(spacing: 12) {
+                            playbackButton
+                            stopButton
                         }
-                        .buttonStyle(StudioSecondaryButtonStyle())
-                        .disabled(coordinator.state == .idle)
                     }
                 }
             }
@@ -182,43 +177,28 @@ struct ControlPanelView: View {
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(StudioPalette.mutedInk)
 
-                    HStack(spacing: 12) {
-                        Button {
-                            coordinator.toggleCameraOverlay()
-                        } label: {
-                            Label(coordinator.isOverlayVisible ? "隐藏浮窗" : "显示浮窗",
-                                  systemImage: coordinator.isOverlayVisible ? "eye.slash" : "camera")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            overlayToggleButton
+                            overlayModeButton
                         }
-                        .buttonStyle(StudioSecondaryButtonStyle())
 
-                        Button {
-                            coordinator.togglePiPMode()
-                        } label: {
-                            Label(pipModeLabel, systemImage: "arrow.up.left.and.arrow.down.right")
+                        VStack(spacing: 12) {
+                            overlayToggleButton
+                            overlayModeButton
                         }
-                        .buttonStyle(StudioSecondaryButtonStyle())
                     }
 
-                    HStack(spacing: 12) {
-                        Button {
-                            coordinator.togglePiPShape()
-                        } label: {
-                            Label(
-                                coordinator.pipState.shape == .circle ? "切回标准比例" : "切换圆形气泡",
-                                systemImage: coordinator.pipState.shape == .circle ? "rectangle.roundedtop" : "circle"
-                            )
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            overlayShapeButton
+                            microphoneMuteButton
                         }
-                        .buttonStyle(StudioSecondaryButtonStyle())
 
-                        Button {
-                            coordinator.toggleMicrophoneMuted()
-                        } label: {
-                            Label(
-                                coordinator.isMicrophoneMuted ? "取消麦克风静音" : "麦克风静音",
-                                systemImage: coordinator.isMicrophoneMuted ? "mic.fill" : "mic.slash.fill"
-                            )
+                        VStack(spacing: 12) {
+                            overlayShapeButton
+                            microphoneMuteButton
                         }
-                        .buttonStyle(StudioSecondaryButtonStyle())
                     }
                 }
             }
@@ -262,8 +242,88 @@ struct ControlPanelView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(24)
-        .frame(width: 500)
+        .padding(20)
+        .frame(width: 440)
         .studioPanelBackground()
+    }
+
+    private var playbackButton: some View {
+        Group {
+            if coordinator.state == .paused {
+                Button {
+                    coordinator.resume()
+                } label: {
+                    Label("继续", systemImage: "play.fill")
+                }
+                .buttonStyle(StudioSecondaryButtonStyle())
+            } else {
+                Button {
+                    coordinator.pause()
+                } label: {
+                    Label("暂停", systemImage: "pause.fill")
+                }
+                .buttonStyle(StudioSecondaryButtonStyle())
+                .disabled(coordinator.state != .recording)
+            }
+        }
+    }
+
+    private var stopButton: some View {
+        Button {
+            coordinator.stopRecording()
+        } label: {
+            Label("停止", systemImage: "stop.fill")
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+        .disabled(coordinator.state == .idle)
+    }
+
+    private var overlayToggleButton: some View {
+        Button {
+            coordinator.toggleCameraOverlay()
+        } label: {
+            Label(coordinator.isOverlayVisible ? "隐藏浮窗" : "显示浮窗",
+                  systemImage: coordinator.isOverlayVisible ? "eye.slash" : "camera")
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var overlayModeButton: some View {
+        Button {
+            coordinator.togglePiPMode()
+        } label: {
+            Label(pipModeLabel, systemImage: "arrow.up.left.and.arrow.down.right")
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var overlayShapeButton: some View {
+        Button {
+            coordinator.togglePiPShape()
+        } label: {
+            Label(
+                coordinator.pipState.shape == .circle ? "切回标准比例" : "切换圆形气泡",
+                systemImage: coordinator.pipState.shape == .circle ? "rectangle.roundedtop" : "circle"
+            )
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var microphoneMuteButton: some View {
+        Button {
+            coordinator.toggleMicrophoneMuted()
+        } label: {
+            Label(
+                coordinator.isMicrophoneMuted ? "取消麦克风静音" : "麦克风静音",
+                systemImage: coordinator.isMicrophoneMuted ? "mic.fill" : "mic.slash.fill"
+            )
+        }
+        .buttonStyle(StudioSecondaryButtonStyle())
+    }
+
+    private var metricDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.75))
+            .frame(width: 1, height: 18)
     }
 }
