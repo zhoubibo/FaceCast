@@ -11,9 +11,6 @@ import AVFoundation
 final class CameraOverlayController: NSObject, NSWindowDelegate {
     private let minimumFloatingWidth: CGFloat = 150
     private let maximumFloatingWidth: CGFloat = 500
-    private let minimumCircleWidth: CGFloat = 132
-    private let maximumCircleWidth: CGFloat = 300
-    private let circleScaleFactor: CGFloat = 0.78
     private let roundedRectAspectRatio: CGFloat = 200.0 / 135.0
 
     /// Called with (normalizedCenter, normalizedWidth) whenever the panel moves
@@ -235,9 +232,7 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         guard mode == .floating else { return }
         var frame = panel.frame
         let top = frame.maxY
-        let minimumWidth = shape == .circle ? minimumCircleWidth : minimumFloatingWidth
-        let maximumWidth = shape == .circle ? maximumCircleWidth : maximumFloatingWidth
-        let newWidth = min(max(minimumWidth, frame.width + event.deltaX), maximumWidth)
+        let newWidth = min(max(minimumFloatingWidth, frame.width + event.deltaX), maximumFloatingWidth)
         let newHeight = overlayHeight(for: newWidth, shape: shape)
         frame.size = NSSize(width: newWidth, height: newHeight)
         frame.origin.y = top - newHeight
@@ -249,15 +244,10 @@ final class CameraOverlayController: NSObject, NSWindowDelegate {
         guard mode == .floating else { return }
         var frame = panel.frame
         let center = CGPoint(x: frame.midX, y: frame.midY)
-        let width = max(frame.width, frame.height)
-
-        if shape == .circle {
-            let square = min(max(width * circleScaleFactor, minimumCircleWidth), maximumCircleWidth)
-            frame.size = NSSize(width: square, height: square)
-        } else {
-            let adjustedWidth = min(max(width, minimumFloatingWidth), maximumFloatingWidth)
-            frame.size = NSSize(width: adjustedWidth, height: overlayHeight(for: adjustedWidth, shape: .roundedRect))
-        }
+        // Keep the visible width stable when switching shapes so the rounded
+        // and circular overlay stay aligned with the user's default size.
+        let targetWidth = min(max(frame.width, minimumFloatingWidth), maximumFloatingWidth)
+        frame.size = NSSize(width: targetWidth, height: overlayHeight(for: targetWidth, shape: shape))
 
         frame.origin = CGPoint(x: center.x - frame.width / 2, y: center.y - frame.height / 2)
         savedFloatingFrame = frame
